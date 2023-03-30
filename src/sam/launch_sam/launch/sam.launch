@@ -1,0 +1,235 @@
+<launch>
+ <!-- Transformation Configuration ... Setting Up the Relationships Between Coordinate Frames --> 
+  
+  <node pkg="tf" type="static_transform_publisher" name="base_link_broadcaster" args="0 0 0.09 0 0 0 base_footprint base_link 30" />
+
+
+  
+    <!-- map to odom will be provided by the AMCL -->
+  <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0 0 0 0 0 0 map odom 30" />
+ 
+ 
+<node pkg="tf" type="static_transform_publisher" name="base_link_to_camera_link" args="0 0.04 0 0 0 0 base_link camera_link 30" />
+
+
+
+
+
+
+
+
+
+
+
+
+  <!-- "camera" should uniquely identify the device. All topics are pushed down
+       into the "camera" namespace, and it is prepended to tf frame ids. -->
+  <arg name="camera" default="camera" />
+  <arg name="rgb_frame_id"   default="$(arg camera)_rgb_optical_frame" />
+  <arg name="depth_frame_id" default="$(arg camera)_depth_optical_frame" />
+
+  <arg name="data_skip" default="0" />
+
+  <!-- device_id can have the following formats:
+         "B00367707227042B": Use device with given serial number
+         "#1"              : Use first device found
+    -->
+  <arg name="device_id" default="#1" />
+
+  <!-- By default, calibrations are stored to file://${ROS_HOME}/camera_info/${NAME}.yaml,
+       where ${NAME} is of the form "[rgb|depth]_[serial#]", e.g. "depth_B00367707227042B".
+       See camera_info_manager docs for calibration URL details. -->
+  <arg name="rgb_camera_info_url"   default="" />
+  <arg name="depth_camera_info_url" default="" />
+
+  <!-- Use OpenNI's factory-calibrated depth->RGB registration? -->
+  <arg name="depth_registration" default="true" />
+
+  <!-- Arguments for remapping all device namespaces -->
+  <arg name="rgb"              default="rgb" />
+  <arg name="ir"               default="ir" />
+  <arg name="depth"            default="depth" />
+  <arg name="depth_registered" default="depth_registered" />
+  <arg name="projector"        default="projector" />
+
+  <!-- Optionally suppress loading the driver nodelet and/or publishing the default tf
+       tree. Useful if you are playing back recorded raw data from a bag, or are
+       supplying a more accurate tf tree from calibration. -->
+  <arg name="load_driver" default="true" />
+  <arg name="publish_tf" default="true" />
+  <!-- Processing Modules -->
+  <arg name="rgb_processing"                  default="true"/>
+  <arg name="ir_processing"                   default="true"/>
+  <arg name="depth_processing"                default="true"/>
+  <arg name="depth_registered_processing"     default="true"/>
+  <arg name="disparity_processing"            default="true"/>
+  <arg name="disparity_registered_processing" default="true"/>
+  <arg name="hw_registered_processing"        default="true" />
+  <arg name="sw_registered_processing"        default="true" />
+
+  <!-- Disable bond topics by default -->
+  <arg name="bond" default="false" /> <!-- DEPRECATED, use respawn arg instead -->
+  <arg name="respawn" default="$(arg bond)" />
+
+  <!-- Worker threads for the nodelet manager -->
+  <arg name="num_worker_threads" default="4" />
+
+  <!-- enable libfreenect debug logging -->
+  <arg name="libfreenect_debug" default="false" />
+
+  <!-- enable diagnostics support for freenect_camera -->
+  <arg name="enable_rgb_diagnostics" default="false" />
+  <arg name="enable_ir_diagnostics" default="false" />
+  <arg name="enable_depth_diagnostics" default="false" />
+  <arg name="diagnostics_max_frequency" default="30.0" />
+  <arg name="diagnostics_min_frequency" default="30.0" />
+  <arg name="diagnostics_tolerance" default="0.05" />
+  <arg name="diagnostics_window_time" default="5.0" />
+ 
+  <!-- Push down all topics/nodelets into "camera" namespace -->
+  <group ns="$(arg camera)">
+
+    <!-- Start nodelet manager in provided namespace -->
+    <arg name="manager" value="$(arg camera)_nodelet_manager" />
+    <arg name="debug" default="false" /> <!-- Run manager in GDB? -->
+    <include file="$(find rgbd_launch)/launch/includes/manager.launch.xml">
+      <arg name="name"                value="$(arg manager)" />
+      <arg name="debug"               value="$(arg debug)" />
+      <arg name="num_worker_threads"  value="$(arg num_worker_threads)" />
+    </include>
+
+    <!-- Load driver -->
+    <include if="$(arg load_driver)"
+	     file="$(find freenect_launch)/launch/includes/device.launch.xml">
+      <!-- Could really use some syntactic sugar for this -->
+      <arg name="manager"                   value="$(arg manager)" />
+      <arg name="device_id"                 value="$(arg device_id)" />
+      <arg name="rgb_frame_id"              value="$(arg rgb_frame_id)" />
+      <arg name="depth_frame_id"            value="$(arg depth_frame_id)" />
+      <arg name="rgb_camera_info_url"       value="$(arg rgb_camera_info_url)" />
+      <arg name="depth_camera_info_url"     value="$(arg depth_camera_info_url)" />
+      <arg name="depth_registration"        value="$(arg depth_registration)" />
+      <arg name="data_skip"                 value="$(arg data_skip)" />
+      <arg name="rgb"                       value="$(arg rgb)" />
+      <arg name="ir"                        value="$(arg ir)" />
+      <arg name="depth"                     value="$(arg depth)" />
+      <arg name="depth_registered"          value="$(arg depth_registered)" />
+      <arg name="projector"                 value="$(arg projector)" />
+      <arg name="respawn"                   value="$(arg respawn)" />
+      <arg name="libfreenect_debug"         value="$(arg libfreenect_debug)" />
+      <arg name="enable_rgb_diagnostics"    value="$(arg enable_rgb_diagnostics)" />
+      <arg name="enable_ir_diagnostics"     value="$(arg enable_ir_diagnostics)" />
+      <arg name="enable_depth_diagnostics"  value="$(arg enable_depth_diagnostics)" />
+      <arg name="diagnostics_max_frequency" value="$(arg diagnostics_max_frequency)" />
+      <arg name="diagnostics_min_frequency" value="$(arg diagnostics_min_frequency)" />
+      <arg name="diagnostics_tolerance"     value="$(arg diagnostics_tolerance)" />
+      <arg name="diagnostics_window_time"   value="$(arg diagnostics_window_time)" />
+    </include>
+    
+    <!-- Load standard constellation of processing nodelets -->
+    <include file="$(find rgbd_launch)/launch/includes/processing.launch.xml">
+      <arg name="manager"                         value="$(arg manager)" />
+      <arg name="rgb"                             value="$(arg rgb)" />
+      <arg name="ir"                              value="$(arg ir)" />
+      <arg name="depth"                           value="$(arg depth)" />
+      <arg name="depth_registered"                value="$(arg depth_registered)" />
+      <arg name="projector"                       value="$(arg projector)" />
+      <arg name="respawn"                         value="$(arg respawn)" />
+      <arg name="rgb_processing"                  value="$(arg rgb_processing)" />
+      <arg name="ir_processing"                   value="$(arg ir_processing)" />
+      <arg name="depth_processing"                value="$(arg depth_processing)" />
+      <arg name="depth_registered_processing"     value="$(arg depth_registered_processing)" />
+      <arg name="disparity_processing"            value="$(arg disparity_processing)" />
+      <arg name="disparity_registered_processing" value="$(arg disparity_registered_processing)" />
+      <arg name="hw_registered_processing"        value="$(arg hw_registered_processing)" />
+      <arg name="sw_registered_processing"        value="$(arg sw_registered_processing)" />
+    </include>
+  
+  </group> <!-- camera -->
+
+  <!-- Load reasonable defaults for the relative pose between cameras -->
+  <include if="$(arg publish_tf)"
+	   file="$(find rgbd_launch)/launch/kinect_frames.launch">
+    <arg name="camera" value="$(arg camera)" />
+  </include>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   <node pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node" name="pointcloud_to_laserscan">  
+       <remap from="cloud_in" to="/camera/depth_registered/points"/>
+       <remap from="scan" to ="/camera/scan"/>
+       <rosparam command="load" file="$(find launch_sam)/launch/kin.yaml" />  
+    </node>
+ 
+    
+ 
+  <!-- Wheel Encoder Tick Publisher and Base Controller Using Arduino --> 
+  <!-- motor_controller_diff_drive_2.ino is the Arduino sketch -->
+  <!-- Subscribe: /cmd_vel -->
+  <!-- Publish: /right_ticks, /left_ticks -->
+  <node pkg="rosserial_python" type="serial_node.py" name="serial_node">
+    <param name="port" value="/dev/ttyACM0"/>
+    <param name="baud" value="115200"/>
+  </node>
+ 
+  <!-- Wheel Odometry Publisher -->
+  <!-- Subscribe: /right_ticks, /left_ticks, /initial_2d -->
+  <!-- Publish: /odom_data_euler, /odom_data_quat -->
+  <node pkg="localization_data_pub" type="ekf_odom_pub" name="ekf_odom_pub">
+  </node> 
+     
+ 
+     
+  <!-- Extended Kalman Filter from robot_pose_ekf Node-->
+  <!-- Subscribe: /odom, /imu_data, /vo -->
+  <!-- Publish: /robot_pose_ekf/odom_combined -->
+  <remap from="odom" to="odom_data_quat" />
+  <remap from="imu_data" to="imu/data" />
+  <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+    <param name="output_frame" value="odom"/>
+    <param name="base_footprint_frame" value="base_footprint"/>
+    <param name="freq" value="30.0"/>
+    <param name="sensor_timeout" value="1.0"/>
+    <param name="odom_used" value="true"/>
+    <param name="imu_used" value="false"/>
+    <param name="vo_used" value="false"/>
+    <param name="gps_used" value="false"/>
+    <param name="debug" value="false"/>
+    <param name="self_diagnose" value="false"/>
+  </node>
+     
+  <!-- Initial Pose and Goal Publisher -->
+  <!-- Publish: /initialpose, /move_base_simple/goal -->
+  <node pkg="rviz" type="rviz" name="rviz" required="true">
+  
+  </node> 
+ 
+  <!-- Subscribe: /initialpose, /move_base_simple/goal -->
+  <!-- Publish: /initial_2d, /goal_2d -->
+  <node pkg="localization_data_pub" type="rviz_click_to_2d" name="rviz_click_to_2d">
+  </node>   
+  
+
+	
+  <!-- Add AMCL example for differential drive robots for Localization -->
+  <!-- Subscribe: /scan, /tf, /initialpose, /map -->
+  <!-- Publish: /amcl_pose, /particlecloud, /tf -->
+  <include file="$(find amcl)/examples/amcl_diff.launch"/>
+	
+
+
+
+  
+</launch>
